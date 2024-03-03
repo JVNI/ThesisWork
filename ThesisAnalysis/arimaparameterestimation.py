@@ -19,13 +19,13 @@ train_data = btc['Log Returns'][:3348]
 test_data = btc['Log Returns'][3348:]
 
 param_grid =  [(1,1,1), (1,1,2), (1,2,1), (2,1,1), (2,2,1), (1,2,2), (2,1,2), (2,2,2), (1,1,3), (1,3,1), (3,1,1), (1,2,3), (2,1,3), (2,2,3), (1,3,1), (1,3,2), (2,3,1), (3,1,2), (3,2,1), (3,2,2), (1,3,3),(3,3,1), (3,1,3), (2,3,3), (3,2,3), (3,3,2), (3,3,3)]
-seasonal_grid = [ (3,1,3,12), (2,3,3,12), (3,2,3,12), (3,3,2,12), (3,3,3,12)]
-# (1,1,1,12), (1,1,2,12), (1,2,1,12), (2,1,1,12), (2,2,1,12), (1,2,2,12), (2,1,2,12), (2,2,2,12), (1,1,3,12), (1,3,1,12), (3,1,1,12), (1,2,3,12), (2,1,3,12), (2,2,3,12), (1,3,1,12), (1,3,2,12), (2,3,1,12), (3,1,2,12), (3,2,1,12), (3,2,2,12), (1,3,3,12),(3,3,1,12),
-# for params in param_grid:
-#     warnings.filterwarnings('ignore')
-#     model = ARIMA(train_data, order=params)
-#     predictions = model.fit()
-#     print(f'For Params {params} AIC: {predictions.aic} BIC : {predictions.bic}')
+seasonal_grid = [(1,1,1,12), (1,1,2,12), (1,2,1,12), (2,1,1,12), (2,2,1,12), (1,2,2,12), (2,1,2,12), (2,2,2,12), (1,1,3,12), (1,3,1,12), (3,1,1,12), (1,2,3,12), (2,1,3,12), (2,2,3,12), (1,3,1,12), (1,3,2,12), (2,3,1,12), (3,1,2,12), (3,2,1,12), (3,2,2,12), (1,3,3,12),(3,3,1,12), (3,1,3,12), (2,3,3,12), (3,2,3,12), (3,3,2,12), (3,3,3,12)]
+
+for params in param_grid:
+    warnings.filterwarnings('ignore')
+    model = ARIMA(train_data, order=params)
+    predictions = model.fit()
+    print(f'For Params {params} AIC: {predictions.aic} BIC : {predictions.bic}')
 
 for seasonal_params in seasonal_grid:
     warnings.filterwarnings('ignore')
