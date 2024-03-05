@@ -15,12 +15,11 @@ btc['Log Returns'] = np.log(btc['Adj Close']) - np.log(btc['Adj Close']).shift(1
 btc.drop(btc.index[0], axis=0, inplace=True)
 btc['Log Returns'] = btc['Log Returns'].rolling(window=500).mean()
 
-train_data = btc['Log Returns'][:3348]
-test_data = btc['Log Returns'][3348:]
+train_data = btc['Log Returns'][:3389]
+test_data = btc['Log Returns'][3389:]
 
 param_grid =  [(1,1,1), (1,1,2), (1,2,1), (2,1,1), (2,2,1), (1,2,2), (2,1,2), (2,2,2), (1,1,3), (1,3,1), (3,1,1), (1,2,3), (2,1,3), (2,2,3), (1,3,1), (1,3,2), (2,3,1), (3,1,2), (3,2,1), (3,2,2), (1,3,3),(3,3,1), (3,1,3), (2,3,3), (3,2,3), (3,3,2), (3,3,3)]
 seasonal_grid = [(1,1,1,12), (1,1,2,12), (1,2,1,12), (2,1,1,12), (2,2,1,12), (1,2,2,12), (2,1,2,12), (2,2,2,12), (1,1,3,12), (1,3,1,12), (3,1,1,12), (1,2,3,12), (2,1,3,12), (2,2,3,12), (1,3,1,12), (1,3,2,12), (2,3,1,12), (3,1,2,12), (3,2,1,12), (3,2,2,12), (1,3,3,12),(3,3,1,12), (3,1,3,12), (2,3,3,12), (3,2,3,12), (3,3,2,12), (3,3,3,12)]
-
 for params in param_grid:
     warnings.filterwarnings('ignore')
     model = ARIMA(train_data, order=params)
