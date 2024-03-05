@@ -67,12 +67,12 @@ def pacf_plot(ticker):
 def arima_model(ticker, train, test, params):
     model = ARIMA(train, order=params)
     model_fit = model.fit()
-    ticker['forecast log returns'] = model_fit.predict(start=3348, end=3419)
-    forecast = model_fit.get_forecast(steps=70)
+    ticker['forecast log returns'] = model_fit.predict(start=3389, end=3419)
+    forecast = model_fit.get_forecast(steps=30)
     ci = forecast.conf_int(alpha=0.05)
     plt.figure(figsize=(12, 8))
     plt.plot(ticker.index, ticker['Log Returns'], label='Log Returns')
-    plt.plot(test, label='Actual Log Returns')
+    plt.plot(test.index, test, label='Actual Log Returns')
     plt.plot(ci.iloc[:, 0], label='Lower CI', color='gray')
     plt.plot(ci.iloc[:, 1], label='Upper CI', color='gray')
     plt.plot(ticker['forecast log returns'], label='Forecasted Log Returns')
@@ -86,12 +86,12 @@ def arima_model(ticker, train, test, params):
 def sarima_model(ticker, train, test, params, seasonal_params):
     model = SARIMAX(train, order=params, seasonal_order=seasonal_params)
     model_fit = model.fit()
-    ticker['forecasting sarima'] = model_fit.predict(start=3348, end=3419)
-    forecast = model_fit.get_forecast(steps=70)
+    ticker['forecasting sarima'] = model_fit.predict(start=3389, end=3419)
+    forecast = model_fit.get_forecast(steps=30)
     ci = forecast.conf_int(alpha=0.05)
     plt.figure(figsize=(12, 8))
     plt.plot(ticker.index, ticker['Log Returns'], label='Log Returns')
-    plt.plot(test, label='Actual Log Returns')
+    plt.plot(test.index, test, label='Actual Log Returns')
     plt.plot(ci.iloc[:, 0], label='Lower CI', color='gray')
     plt.plot(ci.iloc[:, 1], label='Upper CI', color='gray')
     plt.plot(ticker['forecasting sarima'], label='Forecasted Log Returns')
@@ -136,75 +136,9 @@ def check_parameters(train, test):
     print(model.order)
     
 
-train_data = btc['Log Returns'][:3348]
-test_data = btc['Log Returns'][3348:]
-#arima_model(btc, train_data, test_data, (1,1,1))
-sarima_model(btc, train_data, test_data, (1,1,1), (2,1,3,12))
-sarima_diagnostics(btc, train_data, test_data, (1,1,1), (2,1,3,12))
-# model_arima = ARIMA(train_data, order=(1,1,1))
-# model_fit_arima = model_arima.fit()
-# mae_rmse(model_fit_arima, btc)
-# model_sarima = SARIMAX(train_data, order=(1,1,1), seasonal_order=(1,1,1,12))
-# model_fit_sarima = model_sarima.fit()
-# mae_rmse(model_fit_sarima, btc)
-
-
-
-# model = ARIMA(train_data, order=(3,3,3))
-# model_fit = model.fit()
-# btc['forecasting return'] = model_fit.predict(start=3348, end=3419)
-# plt.figure(figsize=(12, 8))
-# plt.plot(btc.index, btc['Log Returns'], label='Log Returns')
-# plt.plot(test_data, label='Actual Log Returns')
-# plt.plot(btc['forecasting return'], label='Forecasted Returns')
-# plt.legend()
-# plt.grid()
-# plt.show()
-
-
-# # model_sarima = SARIMAX(btc['Log Returns'], order=(3,3,3), seasonal_order=(2,1,2,12) )
-# # model_fit_sarima = model.fit()
-# # print(f'AIC: {model_fit_sarima.aic}')
-# # print(f'BIC: {model_fit_sarima.bic}')
-# # btc['forecast returns sarima'] = model_fit_sarima.predict(start=2850, end=3419, dynamic=True)
-# # btc['forecast returns sarima'] += btc['Log Returns'].mean()
-# # plt.figure(figsize=(12, 8))
-# # plt.plot(btc.index, btc['Log Returns'], label='Log Returns')
-# # plt.plot(btc['forecast returns sarima'], label='SARIMA Forecast')
-# # plt.xlabel('Date')
-# # plt.ylabel('Log Returns')
-# # plt.title('Bitcoin Log Returns and ARIMA Forecast with 95% Confidence Interval')
-# # plt.legend()
-# # plt.grid()
-# # plt.show()
-# # btc[['Log Returns', 'forecast returns sarima']].plot(figsize=(12, 8))
-# # plt.show()
-
-# model = SARIMAX(train_data, order=(3,3,3), seasonal_order=(2,1,2,12))
-# model_fit_test_sarimax = model.fit()
-# btc['forecasting sarima'] = model_fit_test_sarimax.predict(start=3350, end=3419, dynamic=True)
-# btc['forecasting sarima'] += btc['Log Returns'].mean()
-# plt.figure(figsize=(12, 8))
-# plt.plot(btc.index, btc['Log Returns'], label='Log Returns')
-# plt.plot(test_data, label='Actual Log Returns')
-# plt.plot(btc['forecasting'], label=('Forecast'))
-# plt.title('SARIMA Forecast vs Actual Log Returns with 95% Confidence Interval')
-# plt.legend()
-# plt.show()
-
-# print('MEAN ABSOLUTE ERROR')
-# forecast = model_fit.get_forecast(steps=3419-2849)
-# mae = mean_absolute_error(btc['Log Returns'].iloc[2848:3419], forecast.predicted_mean)
-# forecast_sarima = model_fit_sarima.get_forecast(steps=3419-2849)
-# mae_sarima = mean_absolute_error(btc['Log Returns'].iloc[2848:3419], forecast_sarima.predicted_mean)
-# print(f'ARIMA MAE: {mae}')
-# print(f'SARIMA MAE: {mae_sarima}')
-# # param_grid =  [(1,1,1), (1,1,2), (1,2,1), (2,1,1), (2,2,1), (1,2,2), (2,1,2), (2,2,2), (1,1,3), (1,3,1), (3,1,1), (1,2,3), (2,1,3), (2,2,3), (1,3,1), (1,3,2), (2,3,1), (3,1,1), (3,1,2), (3,2,1), (3,2,2), (1,3,3),(3,3,1), (3,1,3), (2,3,3), (3,2,3), (3,3,2), (3,3,3)]
-
-
-# def get_rmse(model):
-#     forecast = model.get_forecast(steps=3419-2849)
-#     rmse = mean_squared_error(btc['Log Returns'].iloc[2848:3419], forecast.predicted_mean, squared=False)
-#     print(f'RMSE: {rmse}')
-
-
+train_data = btc['Log Returns'][:3389]
+test_data = btc['Log Returns'][3389:]
+arima_model(btc, train_data, test_data, (1,1,1))
+arima_diagnostics(btc, train_data, test_data, (1,1,1))
+sarima_model(btc, train_data, test_data, (1,1,1), (3,1,3,12))
+sarima_diagnostics(btc, train_data, test_data, (1,1,1), (3,1,3,12))
