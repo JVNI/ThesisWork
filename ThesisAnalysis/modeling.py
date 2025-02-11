@@ -5,52 +5,64 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.ar_model import AutoReg
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-import pmdarima as pm
-from scipy.stats import t
+from statsmodels.graphics.gofplots import qqplot
+from statsmodels.stats.diagnostic import acorr_ljungbox
+from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error, r2_score
+from scipy.stats import norm
+import seaborn as sns
+
 
 btc = yf.download('BTC-USD', start='2014-10-01', end='2024-02-10')
+print(btc)
+btc['Returns'] = btc['Adj Close'] - btc['Adj Close'].shift(1)
 btc['Log Returns'] = np.log(btc['Adj Close']) - np.log(btc['Adj Close']).shift(1)
 btc.drop(btc.index[0], axis=0, inplace=True)
-# btc['Log Returns'].diff()
-# btc['Log Returns'] = btc['Log Returns'].rolling(window=500).mean()
 
+train_data = btc['Log Returns'][:3389]
+test_data = btc['Log Returns'][3388:]
+train_data.dropna(inplace=True)
+
+# Outlier Detection and Trimming
+print(len(train_data))
+upper_limit = train_data.mean() + 3 * train_data.std()
+lower_limit = train_data.mean() - 3 * train_data.std()
+
+# Applying the condition correctly within a single .loc method
+train_data = train_data[(train_data < upper_limit) & (train_data > lower_limit)]
 
 def plot_ticker_price(ticker):
-    plt.plot(ticker.index, ticker['Adj Close'], color='blue')
+    plt.plot(ticker.index[:3389], ticker['Returns'][:3389], color='darkblue')
     plt.xlabel('Date')
     plt.ylabel('Price')
-    plt.title('BTC/USD Price Chart')
+    plt.title('BTC/USD Returns Chart')
     plt.show()
 
 def plot_ticker_log(ticker):
-    plt.plot(ticker.index, ticker['Log Returns'], color='blue')
+    plt.plot(ticker.index[:3389], ticker['Log Returns'][:3389], color='darkblue')
     plt.xlabel('Date')
     plt.ylabel('Log Returns')
     plt.title('BTC/USD Log Returns')
     plt.show()
-# plot_ticker_log(btc)
+
 def decompose_data(ticker):
-    decompose_data = seasonal_decompose(ticker['Adj Close'].dropna(), model = 'additive', period=365, extrapolate_trend='freq')
+    decompose_data = seasonal_decompose(ticker['Returns'][:3389].dropna(), model = 'additive', period=365, extrapolate_trend='freq')
     daily_frequency = ticker.asfreq(freq='D')
     fig, axes = plt.subplots(4, 1, sharex=True)
 
-    decompose_data.observed.plot(ax=axes[0], legend=False, color="blue")
+    decompose_data.observed.plot(ax=axes[0], legend=False, color="darkblue")
     axes[0].set_ylabel('Observed')
-    decompose_data.trend.plot(ax=axes[1], legend=False, color="blue")
+    decompose_data.trend.plot(ax=axes[1], legend=False, color="darkblue")
     axes[1].set_ylabel('Trend')
-    decompose_data.seasonal.plot(ax=axes[2], legend=False, color="blue")
+    decompose_data.seasonal.plot(ax=axes[2], legend=False, color="darkblue")
     axes[2].set_ylabel('Seasonal')
-    decompose_data.resid.plot(ax=axes[3], legend=False, color="blue")
+    decompose_data.resid.plot(ax=axes[3], legend=False, color="darkblue")
     axes[3].set_ylabel('Residual')
     plt.show()
 
-# decompose_data(btc)
-
-def stationarity_test(ticker):
-    ticker['Log Returns'] = ticker['Log Returns']
-    dftest = adfuller(ticker['Log Returns'].dropna(), autolag = 'AIC')
+def stationarity_test(train):
+    dftest = adfuller(train.dropna(), autolag = 'AIC')
     print("1. ADF : ", dftest[0])
     print("2. P-Value : ", dftest[1])
     print("3. Num Of Lags : ", dftest[2])
@@ -59,26 +71,22 @@ def stationarity_test(ticker):
     for key, val in dftest[4].items():
         print("\t",key, ": ", val)
 
-# stationarity_test(btc)
-
-def acf_plot(ticker):
+def acf_plot(train):
     fig, ax = plt.subplots(figsize=(12,8))
-    plot_acf(ticker['Log Returns'].diff().dropna(), lags=58, alpha=0.05, ax=ax, color='blue')
+    plot_acf(train_data, lags=20, alpha=0.05, ax=ax, color='darkblue')
     ax.set_title('Autocorrelation Function with 95% Confidence Interval')
     ax.set_xlabel('Lag')
     ax.set_ylabel('Autocorrelation')
     plt.show()
 
-# acf_plot(btc)
-
-def pacf_plot(ticker):
+def pacf_plot(train):
     fig, ax = plt.subplots(figsize=(10, 6))
-    plot_pacf(ticker['Log Returns'].diff().dropna(), lags=58, alpha=0.05, ax=ax, color='blue')
+    plot_pacf(train_data, lags=20, alpha=0.05, ax=ax, color='darkblue')
     ax.set_title('Partial Autocorrelation Function with 95% Confidence Interval')
     ax.set_xlabel('Lag')
     ax.set_ylabel('Partial Autocorrelation')
     plt.show()
-#pacf_plot(btc)
+pacf_plot(train_data)
 
 def model_arima(ticker, train, test, params):
     model = ARIMA(train, order=params)
@@ -88,7 +96,7 @@ def model_arima(ticker, train, test, params):
     ci = forecast.conf_int(alpha=0.05)
 
     plt.figure(figsize=(12,6))
-    train.plot(color='blue', label='Training Data (Log Returns)')
+    train.plot(color='darkblue', label='Training Data (Log Returns)')
     test.plot(color='green', label='Actual Log Returns')
     plt.plot(test.index, forecast_series, label='forecast', color='red')
     plt.plot(test.index, ci.iloc[:, 0], label='Lower Confidence Interval', color='gray')
@@ -96,7 +104,7 @@ def model_arima(ticker, train, test, params):
     plt.legend()
     plt.xlabel('Date')
     plt.ylabel('Log Returns')
-    plt.title('BTC/USD ARIMA Forecasted vs Actual Log Returns with 95% Confidence Interval')
+    plt.title('BTC Log Return ARIMA Forecasted vs Actual Log Returns with 95% Confidence Interval')
     plt.show()
 
 def model_close_arima(ticker, train, test, params):
@@ -113,24 +121,28 @@ def model_close_arima(ticker, train, test, params):
     plt.legend()
     plt.xlabel('Date')
     plt.ylabel('Log Returns')
-    plt.title('BTC/USD ARIMA Close-up Forecasted vs Actual Log Returns')
+    plt.title('BTC Log Return ARIMA Close-up Forecasted vs Actual Log Returns')
     plt.show()
 
 def sarima_model(ticker, train, test, params, seasonal_params):
     model = SARIMAX(train, order=params, seasonal_order=seasonal_params)
-    model_fit = model.fit()
-    ticker['forecasting sarima'] = model_fit.predict(start=3389, end=3419)
+    model_fit = model.fit(disp=False)
     
+    # Forecasting the next 30 steps
     forecast = model_fit.get_forecast(steps=30)
+    forecast_series = forecast.predicted_mean
     ci = forecast.conf_int(alpha=0.05)
+    
+    # Ensuring the forecast index matches the test data index
+    forecast_index = test.index[:30]
+
     plt.figure(figsize=(12, 8))
-    plt.plot(ticker.index, ticker['Log Returns'], label='Log Returns', color = "blue" )
-    plt.plot(test.index, test, label='Actual Log Returns', color = "green")
-    plt.plot(ci.iloc[:, 0], label='Lower Confidence Interval', color='gray')
-    plt.plot(ci.iloc[:, 1], label='Upper Confidence Interval', color='gray')
-    plt.plot(ticker['forecasting sarima'], label='Forecasted Log Returns', color = "red")
-    plt.fill_between(ci.index, ci.iloc[:, 0], ci.iloc[:, 1], color='gray', alpha=0.25)
-    plt.title('BTC/USD SARIMA Forecasted vs Actual Log Returns with 95% Confidence Interval')
+    plt.plot(train.index, train, label='Training Data (Log Returns)', color="darkblue")
+    plt.plot(test.index, test, label='Actual Log Returns', color="green")
+    plt.plot(forecast_index, forecast_series, label='Forecasted Log Returns', color="red")
+    plt.fill_between(forecast_index, ci.iloc[:, 0], ci.iloc[:, 1], color='gray', alpha=0.25)
+    
+    plt.title('BTC Log Return SARIMA Forecasted vs Actual Log Returns with 95% Confidence Interval')
     plt.legend()
     plt.xlabel('Date')
     plt.ylabel('Log Returns')
@@ -154,16 +166,97 @@ def model_close_sarima(ticker, train, test, params, seasonal_params):
     plt.show()
 
 def arima_diagnostics(ticker, train, test, params):
+        # Fit the ARIMA model
     arima_model = ARIMA(train, order=params)
     arima_model_fit = arima_model.fit()
-    arima_model_fit.plot_diagnostics(figsize=(12, 8))
+    
+    # Extract the residuals
+    residuals = arima_model_fit.resid
+    
+    # Create custom diagnostic plots with dark blue color
+    fig, ax = plt.subplots(2, 2, figsize=(12, 8))
+
+    # Residuals plot
+    ax[0, 0].plot(residuals, color='darkblue')
+    ax[0, 0].set_title('Residuals')
+    
+    # Q-Q plot
+    qqplot(residuals, line='s', ax=ax[0, 1], color='darkblue')
+    ax[0, 1].set_title('Q-Q Plot')
+
+    # ACF plot
+    plot_acf(residuals, ax=ax[1, 0], color='darkblue')
+    ax[1, 0].set_title('Autocorrelation')
+    
+    # Residuals histogram with density line and normal distribution reference line
+    sns.histplot(residuals, kde=True, ax=ax[1, 1], color='darkblue', edgecolor='black', stat='density', bins=30)
+
+    # Calculate mean and standard deviation of residuals
+    mean_resid = np.mean(residuals)
+    std_resid = np.std(residuals)
+    
+    # Generate values for the normal distribution reference line
+    x = np.linspace(min(residuals), max(residuals), 100)
+    y = norm.pdf(x, mean_resid, std_resid)
+    
+    # Plot the normal distribution reference line
+    ax[1, 1].plot(x, y, 'r', linestyle='--', label='Normal Distribution')
+    ax[1, 1].legend()
+    ax[1, 1].set_title('Histogram with Density and Normal Distribution')
+
+    plt.tight_layout()
     plt.show()
+
+    residuals = arima_model_fit.resid
+    Btest = acorr_ljungbox(residuals, lags=10, return_df=True)
+
+    print(Btest)
 
 def sarima_diagnostics(ticker, train, test, params, seasonal_params):
     sarima_model = SARIMAX(train, order=params, seasonal_order=seasonal_params)
     sarima_model_fit = sarima_model.fit()
-    sarima_model_fit.plot_diagnostics(figsize=(12, 8))
+    residuals = sarima_model_fit.resid
+    
+    # Creat Custom diangnostics with dark blue color
+    
+    fig, ax = plt.subplots(2, 2, figsize=(12, 8))
+
+    # Residuals plot
+    ax[0, 0].plot(residuals, color='darkblue')
+    ax[0, 0].set_title('Residuals')
+    
+    # Q-Q plot
+    qqplot(residuals, line='s', ax=ax[0, 1], color='darkblue')
+    ax[0, 1].set_title('Q-Q Plot')
+
+    # ACF plot
+    plot_acf(residuals, ax=ax[1, 0], color='darkblue')
+    ax[1, 0].set_title('Autocorrelation')
+    
+    # Residuals histogram with density line and normal distribution reference line
+    sns.histplot(residuals, kde=True, ax=ax[1, 1], color='darkblue', edgecolor='black', stat='density', bins=30)
+
+    # Calculate mean and standard deviation of residuals
+    mean_resid = np.mean(residuals)
+    std_resid = np.std(residuals)
+    
+    # Generate values for the normal distribution reference line
+    x = np.linspace(min(residuals), max(residuals), 100)
+    y = norm.pdf(x, mean_resid, std_resid)
+    
+    # Plot the normal distribution reference line
+    ax[1, 1].plot(x, y, 'r', linestyle='--', label='Normal Distribution')
+    ax[1, 1].legend()
+    ax[1, 1].set_title('Histogram with Density and Normal Distribution')
+
+    plt.tight_layout()
     plt.show()
+
+    residuals = sarima_model_fit.resid
+    Btest = acorr_ljungbox(residuals, lags=10, return_df=True)
+
+
+
 
 # ERRORS CHANGE WHEN COMPUTING
 def mae_rmse(model, ticker):
@@ -186,25 +279,53 @@ def check_parameters(train, test):
     print(model.summary())
     print(model.order)
 
+def arima_eval(train, test, params):
+    model = ARIMA(train, order=params)
+    model_fit = model.fit()
+    forecast = model_fit.get_forecast(30)
+    rmse = mean_squared_error(test, forecast.predicted_mean, squared=False)
+    mae = mean_absolute_error(test, forecast.predicted_mean)
+    mape = mean_absolute_percentage_error(test, forecast.predicted_mean) 
+    r2 = r2_score(test, forecast.predicted_mean)
+    print(f'MAE: {mae}\nRMSE: {rmse}\nMAPE: {mape}\nR-Squared = {r2}')
+   
 
-train_data = btc['Log Returns'][:3389]
-test_data = btc['Log Returns'][3388:]
-train_data.dropna(inplace=True)
-# arima_model = pm.auto_arima(train_data, seasonal=False, stepwise=False)
-# sarima_model = pm.auto_arima(train_data, start_p=1,start_q=1,test='adf',m=6,seasonal=True,trace=True)
-# # print(arima_model.summary())
-# print(sarima_model.summary())
-# order = sarima_model.order
-# seasonal_order = sarima_model.seasonal_order
+def sarima_eval(train, test, params, seasonalparams):
+    model = SARIMAX(train, order = params, seasonal_order = seasonalparams)
+    model_fit = model.fit()
+    forecast = model_fit.get_forecast(30)
+    rmse = mean_squared_error(test, forecast.predicted_mean, squared=False)
+    mae = mean_absolute_error(test, forecast.predicted_mean)
+    mape = mean_absolute_percentage_error(test, forecast.predicted_mean) * 100
+    r2 = r2_score(test, forecast.predicted_mean)
+    print(f'MAE: {mae}\nRMSE: {rmse}\nMAPE: {mape}\nR-Squared = {r2}')
 
-# print(f"Order (p, d, q): {order}")
-# print(f"Seasonal Order (P, D, Q, m): {seasonal_order}")
-# model_arima(btc, train_data, test_data, (1,0,2))
-# model_close_arima(btc, train_data, test_data, (1,0,2))
-arima_diagnostics(btc, train_data, test_data, (1,0,2))
+def ar_model(train, test, lags):
+    model = AutoReg(train, lags = lags)
+    model_fit = model.fit()
+    forecast = model_fit.predict(start=len(train), end=len(train)+len(test)-1)
+    rmse = mean_squared_error(test, forecast, squared=False)
+    mae = mean_absolute_error(test, forecast)
+    mape = mean_absolute_percentage_error(test, forecast) * 100
+    r2 = r2_score(test, forecast)
+    print(f'AR MODEL:\nMAE: {mae}\nRMSE: {rmse}\nMAPE: {mape}\nR-Squared = {r2}')
 
-# sarima_model(btc, train_data, test_data, (0,0,0), (0,0,1,6))
-sarima_diagnostics(btc, train_data, test_data, (0,0,0), (0,0,1,6))
-# model_close_sarima(btc, train_data, test_data, (0,0,0), (0,0,1,6))
+def sma_model(train, test, window):
+    train_series = pd.Series(train)
+    forecast = train_series.rolling(window=window).mean().iloc[-len(test):]
+    rmse = mean_squared_error(test, forecast, squared=False)
+    mae = mean_absolute_error(test, forecast)
+    mape = mean_absolute_percentage_error(test, forecast) * 100
+    r2 = r2_score(test, forecast)
+    print(f'SMA:\nMAE: {mae}\nRMSE: {rmse}\nMAPE: {mape}\nR-Squared = {r2}')
 
-# model_arima(btc, train_data, test_data, (0,1,0))
+def ema_model(train, test, span):
+    train_series = pd.Series(train)
+    forecast = train_series.ewm(span=span, adjust=False).mean().iloc[-len(test):]
+    rmse = mean_squared_error(test, forecast, squared=False)
+    mae = mean_absolute_error(test, forecast)
+    mape = mean_absolute_percentage_error(test, forecast) * 100
+    r2 = r2_score(test, forecast)
+    print(f'EMA:\nMAE: {mae}\nRMSE: {rmse}\nMAPE: {mape}\nR-Squared = {r2}')
+
+
